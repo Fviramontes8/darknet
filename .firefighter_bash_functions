@@ -1,0 +1,11 @@
+#!/bin/bash
+
+function yolov2_tiny_test() {
+	if [ ! -d "results/image_pred_yolov2_tiny" ] 
+	then
+		mkdir results/image_pred_yolov2_tiny
+	fi
+	./darknet detector test ../FireFighterProject/firefighterdarknet/thermal_model.data ../FireFighterProject/firefighterdarknet/firefighter_cfg/yolov2-tiny-model-thermal.cfg ../FireFighterProject/firefighterdarknet/firefighter_weights/yolov2-tiny-model-thermal_best.weights -dont_show -ext_output < ../FireFighterProject/firefighterdarknet/test_image_list.txt -i 0 -thresh 0.5 > results/yolov2-tiny_results.txt
+	mv *.jpg results/image_pred_yolov2_tiny
+}
+
