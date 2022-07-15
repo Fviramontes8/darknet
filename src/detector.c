@@ -13,11 +13,36 @@
 #define __COMPAR_FN_T
 typedef int (*__compar_fn_t)(const void*, const void*);
 #ifdef __USE_GNU
-typedef __compar_fn_t comparison_fn_t;
+typedef __compar_fn_t comparison_fn_t; #endif
 #endif
 #endif
 
 #include "http_stream.h"
+
+int find_char(const char *s, char search_char) {
+	int i, idx = -1;
+	for (i=0; s[i] != '\0'; i++) {
+		if (s[i] == search_char) {
+			idx = i;
+		}
+	}
+	return idx;
+}
+
+void extract_str(const char *src, char dst[], int begin, int end) {
+	int i;
+	for (i=begin; i<end; i++) {
+		dst[i-begin] = src[i];
+	}
+	dst[i] = '\0';
+}
+
+void string_cat(const char *src, char dst[], int begin, int end) {
+	int i;
+	for (i=begin; i<end; i++) {
+		dst[i] = src[i-begin];
+	}
+}
 
 int check_mistakes = 0;
 
@@ -1626,6 +1651,17 @@ void calc_anchors(char *datacfg, int num_of_clusters, int width, int height, int
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh,
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers)
 {
+
+    /************************************************************************/
+    /*                            Josiah                                    */
+    /************************************************************************/
+    //[Josiah] variable used to for average prediction rate
+	double total_detect_time; 
+    //[Josiah] variable used for running total of detections made
+	int total_detect; 
+    /************************************************************************/
+    /*                           End Josiah                                 */
+    /************************************************************************/
     list *options = read_data_cfg(datacfg);
     char *name_list = option_find_str(options, "names", "data/names.list");
     int names_size = 0;
@@ -1701,19 +1737,84 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         double time = get_time_point();
         network_predict(net, X);
         //network_predict_image(&net, im); letterbox = 1;
-        printf("%s: Predicted in %lf milli-seconds.\n", input, ((double)get_time_point() - time) / 1000);
+
+        /********************************************************************/
+        /*                          Josiah                                  */
+        /********************************************************************/
+
+        total_detect++;
+        const double detect_time = ((double) get_time_point() - time) / 1000.0;
+        total_detect_time += detect_time;
+        printf("%s: Predicted in %lf milli-seconds.\n", input, detect_time);
+
+        /********************************************************************/
+        /*                         End Josiah                               */
+        /********************************************************************/
+        //printf("%s: Predicted in %lf milli-seconds.\n", input, ((double)get_time_point() - time) / 1000);
         //printf("%s: Predicted in %f seconds.\n", input, (what_time_is_it_now()-time));
 
         int nboxes = 0;
-        detection *dets = get_network_boxes(&net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes, letter_box);
+        detection *dets = get_network_boxes(
+            &net, 
+            im.w, 
+            im.h, 
+            thresh, 
+            hier_thresh, 
+            0, 
+            1, 
+            &nboxes, 
+            letter_box
+        );
         if (nms) {
             if (l.nms_kind == DEFAULT_NMS) do_nms_sort(dets, nboxes, l.classes, nms);
             else diounms_sort(dets, nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
         }
         draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, ext_output);
-        save_image(im, "predictions");
+
+        /********************************************************************/
+        /*                          Frankie                                 */
+        /********************************************************************/
+        const int last_slash_idx = find_char(input, '/') + 1;
+        const int last_period_idx = find_char(input, '.');
+        const int filename_length = last_period_idx - last_slash_idx;
+        const char* prediction_str = "_predictions";
+        const int prediction_strlen = 12;
+        const int darknet_pred_filelen = filename_length+prediction_strlen;
+
+        char darknet_pred_file[darknet_pred_filelen + 1];
+        extract_str(input, darknet_pred_file, last_slash_idx, last_period_idx);
+        string_cat(
+            prediction_str, 
+            darknet_pred_file, 
+            darknet_pred_filelen-prediction_strlen, 
+            darknet_pred_filelen
+        );
+        darknet_pred_file[darknet_pred_filelen] = '\0';
+        printf("Saving file as %s\n", darknet_pred_file);
+        fflush(stdout);
+        save_image(im, darknet_pred_file);
+        for (int iter=0; iter<darknet_pred_filelen; ++iter) {
+            printf("\'%c\' ", darknet_pred_file[iter]);
+        }
+        printf("\n");
+        printf("Saved file as %s\n", darknet_pred_file);
+        /*
+
+           printf("Darknet pred before cat: %s\n", darknet_pred_file);
+        //printf("Darknet pred after cat: %s\n", darknet_pred_file);
+           printf("\nINPUT = %s, DARKNET PREDICTION FILE: %s\n\n", 
+            input, 
+            darknet_pred_file
+           );
+         */
+        /********************************************************************/
+        /*                         End Frankie                              */
+        /********************************************************************/
+
+        // save_image(im, "predictions");
         if (!dont_show) {
-            show_image(im, "predictions");
+            save_image(im, darknet_pred_file);
+            //show_image(im, "predictions");
         }
 
         if (json_file) {
